@@ -72,18 +72,31 @@ func (b *TypeBuilder) Build() Type {
 
 // EnumBuilder provides a fluent API for building enum types.
 type EnumBuilder struct {
-	t Type
+	t      Type
+	names  map[string]struct{}
+	numbers map[int]struct{}
 }
 
 // Enum creates a new EnumBuilder for an enum type with the given name.
 func Enum(name string) *EnumBuilder {
 	return &EnumBuilder{
-		t: Type{Kind: KindEnum, Name: name},
+		t:       Type{Kind: KindEnum, Name: name},
+		names:   make(map[string]struct{}),
+		numbers: make(map[int]struct{}),
 	}
 }
 
 // Value adds an enum value with the given name and number.
+// Duplicate names or numbers are silently ignored.
 func (b *EnumBuilder) Value(name string, number int) *EnumBuilder {
+	if _, exists := b.names[name]; exists {
+		return b
+	}
+	if _, exists := b.numbers[number]; exists {
+		return b
+	}
+	b.names[name] = struct{}{}
+	b.numbers[number] = struct{}{}
 	b.t.Values = append(b.t.Values, EnumValue{Name: name, Number: number})
 	return b
 }

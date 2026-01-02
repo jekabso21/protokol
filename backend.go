@@ -64,7 +64,8 @@ func (r *BackendRegistry) Get(name string) (Backend, bool) {
 	return b, ok
 }
 
-// Close closes all registered backends. Returns the first error encountered.
+// Close closes all registered backends and clears the registry.
+// Returns the first error encountered. Safe to call multiple times.
 func (r *BackendRegistry) Close() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -74,5 +75,6 @@ func (r *BackendRegistry) Close() error {
 			firstErr = err
 		}
 	}
+	clear(r.backends)
 	return firstErr
 }

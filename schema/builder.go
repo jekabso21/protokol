@@ -42,7 +42,8 @@ func (b *ServiceBuilder) Description(desc string) *ServiceBuilder {
 	return b
 }
 
-// Method adds a method to the service.
+// Method adds a method to the service. Returns an error if a method
+// with the same name already exists.
 func (b *ServiceBuilder) Method(m Method) *ServiceBuilder {
 	if b.err != nil {
 		return b
@@ -50,6 +51,12 @@ func (b *ServiceBuilder) Method(m Method) *ServiceBuilder {
 	if m.Name == "" {
 		b.err = errors.New("method name required")
 		return b
+	}
+	for _, existing := range b.service.Methods {
+		if existing.Name == m.Name {
+			b.err = errors.New("duplicate method name: " + m.Name)
+			return b
+		}
 	}
 	b.service.Methods = append(b.service.Methods, m)
 	return b
