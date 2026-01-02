@@ -3,6 +3,7 @@ package rest
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"sync"
@@ -11,6 +12,8 @@ import (
 
 	"github.com/jekabolt/protokol"
 	"github.com/jekabolt/protokol/adapters"
+	"github.com/jekabolt/protokol/middleware/auth"
+	"github.com/jekabolt/protokol/middleware/ratelimit"
 	"github.com/jekabolt/protokol/schema"
 )
 
@@ -145,6 +148,18 @@ func (a *Adapter) httpMethod(method schema.Method) string {
 }
 
 func (a *Adapter) makeHandler(svc schema.Service, method schema.Method) http.HandlerFunc {
+	// Build the handler chain: middleware -> backend call
+	var handler adapters.Handler = adapters.HandlerFunc(func(ctx context.Context, req *protokol.Request) (*protokol.Response, error) {
+		backend, ok := a.config.Backends.Get(svc.Backend)
+		if !ok {
+			return nil, protokol.ErrBackendNotFound
+		}
+		return backend.Call(ctx, req)
+	})
+
+	// Apply middleware in reverse order
+	handler = adapters.Chain(handler, a.config.Middleware...)
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
@@ -155,6 +170,7 @@ func (a *Adapter) makeHandler(svc schema.Service, method schema.Method) http.Han
 			clear(req.Input)
 			clear(req.Metadata)
 			req.RawInput = nil
+			req.RemoteAddr = ""
 			a.reqPool.Put(req)
 		}()
 
@@ -178,20 +194,33 @@ func (a *Adapter) makeHandler(svc schema.Service, method schema.Method) http.Han
 			req.Metadata[k] = v
 		}
 
-		backend, ok := a.config.Backends.Get(svc.Backend)
-		if !ok {
-			a.writeError(w, http.StatusInternalServerError, "backend not found: "+svc.Backend)
-			return
-		}
+		// Set remote address from connection
+		req.RemoteAddr = r.RemoteAddr
 
-		resp, err := backend.Call(ctx, req)
+		resp, err := handler.Handle(ctx, req)
 		if err != nil {
-			a.writeError(w, http.StatusInternalServerError, err.Error())
+			status := a.errorStatus(err)
+			a.writeError(w, status, err.Error())
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(resp.Output)
+	}
+}
+
+func (a *Adapter) errorStatus(err error) int {
+	switch {
+	case errors.Is(err, protokol.ErrBackendNotFound):
+		return http.StatusInternalServerError
+	case errors.Is(err, auth.ErrUnauthorized),
+		errors.Is(err, auth.ErrInvalidToken),
+		errors.Is(err, auth.ErrMissingToken):
+		return http.StatusUnauthorized
+	case errors.Is(err, ratelimit.ErrRateLimited):
+		return http.StatusTooManyRequests
+	default:
+		return http.StatusInternalServerError
 	}
 }
 

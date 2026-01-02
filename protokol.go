@@ -10,6 +10,7 @@ import (
 	"github.com/jekabolt/protokol/schema"
 )
 
+// Version is the current version of the protokol library.
 const Version = "0.1.0-dev"
 
 // Adapter exposes the schema through a specific protocol.
@@ -29,6 +30,7 @@ type Protokol struct {
 	running bool
 }
 
+// New creates a new Protokol instance with an empty schema and backend registry.
 func New() *Protokol {
 	return &Protokol{
 		schema:   schema.NewSchema(),
@@ -36,20 +38,25 @@ func New() *Protokol {
 	}
 }
 
+// Schema returns the schema for configuring services and methods.
 func (p *Protokol) Schema() *schema.Schema {
 	return p.schema
 }
 
+// Backends returns the registry for managing backend implementations.
 func (p *Protokol) Backends() *BackendRegistry {
 	return p.backends
 }
 
+// AddAdapter registers a protocol adapter to expose the schema.
 func (p *Protokol) AddAdapter(a Adapter) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.adapters = append(p.adapters, a)
 }
 
+// Run starts all registered adapters and blocks until the context is cancelled
+// or an adapter returns an error. Returns ErrAlreadyRunning if already running.
 func (p *Protokol) Run(ctx context.Context) error {
 	p.mu.Lock()
 	if p.running {
@@ -75,6 +82,8 @@ func (p *Protokol) Run(ctx context.Context) error {
 	}
 }
 
+// Stop gracefully shuts down all adapters and closes all backends.
+// Returns the first error encountered during shutdown.
 func (p *Protokol) Stop(ctx context.Context) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
@@ -11,14 +12,17 @@ import (
 	"github.com/jekabolt/protokol/adapters"
 	"github.com/jekabolt/protokol/adapters/rest"
 	"github.com/jekabolt/protokol/backend"
+	"github.com/jekabolt/protokol/middleware/logging"
+	"github.com/jekabolt/protokol/middleware/ratelimit"
+	"github.com/jekabolt/protokol/middleware/recover"
 	"github.com/jekabolt/protokol/schema"
 )
 
 func main() {
-	// Create protokol instance
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
 	p := protokol.New()
 
-	// Define UserService schema
 	userService := schema.NewService("UserService").
 		Backend("users").
 		Description("User management service").
@@ -32,7 +36,6 @@ func main() {
 				Field("email", schema.String).
 				Build()).
 			HTTP("GET", "/users/{id}").
-			Description("Get a user by ID").
 			Build()).
 		Method(schema.Unary("CreateUser").
 			Input(schema.Message("CreateUserRequest").
@@ -45,7 +48,6 @@ func main() {
 				Field("email", schema.String).
 				Build()).
 			HTTP("POST", "/users").
-			Description("Create a new user").
 			Build()).
 		Method(schema.Unary("ListUsers").
 			Input(schema.Message("ListUsersRequest").
@@ -61,14 +63,11 @@ func main() {
 				Field("total", schema.Int32).
 				Build()).
 			HTTP("GET", "/users").
-			Description("List all users").
 			Build()).
 		MustBuild()
 
-	// Register schema
 	p.Schema().AddService(userService)
 
-	// Create handler backend
 	userBackend := backend.NewHandler()
 
 	userBackend.Register("UserService", "GetUser", func(ctx context.Context, input map[string]any) (map[string]any, error) {
@@ -98,21 +97,26 @@ func main() {
 		}, nil
 	})
 
-	// Register backend
 	p.Backends().Register("users", userBackend)
 
-	// Add REST adapter
+	// Configure middleware
+	middleware := []adapters.Middleware{
+		recover.New(logger),
+		logging.New(logger),
+		ratelimit.New(10, 20, ratelimit.ByIP), // 10 req/s, burst of 20
+	}
+
 	restAdapter := rest.New(rest.Config{
 		Config: adapters.Config{
-			Schema:   p.Schema(),
-			Backends: p.Backends(),
+			Schema:     p.Schema(),
+			Backends:   p.Backends(),
+			Middleware: middleware,
 		},
 		Listen:     ":8080",
 		PathPrefix: "/api/v1",
 	})
 	p.AddAdapter(restAdapter)
 
-	// Setup graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -127,7 +131,6 @@ func main() {
 
 	log.Println("Starting server on :8080")
 	log.Println("Try: curl http://localhost:8080/api/v1/users/123")
-	log.Println("Try: curl -X POST http://localhost:8080/api/v1/users -d '{\"name\":\"Test\",\"email\":\"test@example.com\"}'")
 
 	if err := p.Run(ctx); err != nil {
 		log.Fatal(err)
