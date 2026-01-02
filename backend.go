@@ -42,18 +42,21 @@ type BackendRegistry struct {
 	backends map[string]Backend
 }
 
+// NewBackendRegistry creates a new empty backend registry.
 func NewBackendRegistry() *BackendRegistry {
 	return &BackendRegistry{
 		backends: make(map[string]Backend),
 	}
 }
 
+// Register adds a backend with the given name to the registry.
 func (r *BackendRegistry) Register(name string, b Backend) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.backends[name] = b
 }
 
+// Get retrieves a backend by name. Returns false if not found.
 func (r *BackendRegistry) Get(name string) (Backend, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -61,6 +64,7 @@ func (r *BackendRegistry) Get(name string) (Backend, bool) {
 	return b, ok
 }
 
+// Close closes all registered backends. Returns the first error encountered.
 func (r *BackendRegistry) Close() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()

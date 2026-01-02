@@ -1,20 +1,22 @@
 package schema
 
-// Primitive type helpers.
+// Primitive type helpers for common scalar types.
 var (
-	String  = Type{Kind: KindString}
-	Int32   = Type{Kind: KindInt32}
-	Int64   = Type{Kind: KindInt64}
-	Float32 = Type{Kind: KindFloat32}
-	Float64 = Type{Kind: KindFloat64}
-	Bool    = Type{Kind: KindBool}
-	Bytes   = Type{Kind: KindBytes}
+	String  = Type{Kind: KindString}  // String is a UTF-8 string type.
+	Int32   = Type{Kind: KindInt32}   // Int32 is a 32-bit signed integer type.
+	Int64   = Type{Kind: KindInt64}   // Int64 is a 64-bit signed integer type.
+	Float32 = Type{Kind: KindFloat32} // Float32 is a 32-bit floating point type.
+	Float64 = Type{Kind: KindFloat64} // Float64 is a 64-bit floating point type.
+	Bool    = Type{Kind: KindBool}    // Bool is a boolean type.
+	Bytes   = Type{Kind: KindBytes}   // Bytes is a byte slice type.
 )
 
+// Repeated creates a repeated (array/slice) type with the given element type.
 func Repeated(elem Type) Type {
 	return Type{Kind: KindRepeated, Elem: &elem}
 }
 
+// Map creates a map type with the given key and value types.
 func Map(key, value Type) Type {
 	return Type{Kind: KindMap, Key: &key, Elem: &value}
 }
@@ -24,12 +26,14 @@ type TypeBuilder struct {
 	t Type
 }
 
+// Message creates a new TypeBuilder for a message type with the given name.
 func Message(name string) *TypeBuilder {
 	return &TypeBuilder{
 		t: Type{Kind: KindMessage, Name: name},
 	}
 }
 
+// Field adds an optional field to the message type.
 func (b *TypeBuilder) Field(name string, typ Type) *TypeBuilder {
 	b.t.Fields = append(b.t.Fields, Field{
 		Name:   name,
@@ -39,6 +43,7 @@ func (b *TypeBuilder) Field(name string, typ Type) *TypeBuilder {
 	return b
 }
 
+// RequiredField adds a required field to the message type.
 func (b *TypeBuilder) RequiredField(name string, typ Type) *TypeBuilder {
 	b.t.Fields = append(b.t.Fields, Field{
 		Name:     name,
@@ -49,6 +54,7 @@ func (b *TypeBuilder) RequiredField(name string, typ Type) *TypeBuilder {
 	return b
 }
 
+// FieldWithDefault adds a field with a default value to the message type.
 func (b *TypeBuilder) FieldWithDefault(name string, typ Type, defaultVal any) *TypeBuilder {
 	b.t.Fields = append(b.t.Fields, Field{
 		Name:    name,
@@ -59,6 +65,7 @@ func (b *TypeBuilder) FieldWithDefault(name string, typ Type, defaultVal any) *T
 	return b
 }
 
+// Build returns the constructed Type.
 func (b *TypeBuilder) Build() Type {
 	return b.t
 }
@@ -68,17 +75,20 @@ type EnumBuilder struct {
 	t Type
 }
 
+// Enum creates a new EnumBuilder for an enum type with the given name.
 func Enum(name string) *EnumBuilder {
 	return &EnumBuilder{
 		t: Type{Kind: KindEnum, Name: name},
 	}
 }
 
+// Value adds an enum value with the given name and number.
 func (b *EnumBuilder) Value(name string, number int) *EnumBuilder {
 	b.t.Values = append(b.t.Values, EnumValue{Name: name, Number: number})
 	return b
 }
 
+// Build returns the constructed enum Type.
 func (b *EnumBuilder) Build() Type {
 	return b.t
 }
