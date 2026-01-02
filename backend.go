@@ -14,11 +14,12 @@ type Backend interface {
 
 // Request represents an incoming request to a backend.
 type Request struct {
-	Service  string
-	Method   string
-	Input    map[string]any
-	RawInput []byte
-	Metadata map[string][]string
+	Service    string
+	Method     string
+	Input      map[string]any
+	RawInput   []byte
+	Metadata   map[string][]string
+	RemoteAddr string // Client IP address from connection
 }
 
 // Response represents a backend response.

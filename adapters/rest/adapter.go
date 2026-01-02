@@ -12,6 +12,8 @@ import (
 
 	"github.com/jekabolt/protokol"
 	"github.com/jekabolt/protokol/adapters"
+	"github.com/jekabolt/protokol/middleware/auth"
+	"github.com/jekabolt/protokol/middleware/ratelimit"
 	"github.com/jekabolt/protokol/schema"
 )
 
@@ -168,6 +170,7 @@ func (a *Adapter) makeHandler(svc schema.Service, method schema.Method) http.Han
 			clear(req.Input)
 			clear(req.Metadata)
 			req.RawInput = nil
+			req.RemoteAddr = ""
 			a.reqPool.Put(req)
 		}()
 
@@ -191,6 +194,9 @@ func (a *Adapter) makeHandler(svc schema.Service, method schema.Method) http.Han
 			req.Metadata[k] = v
 		}
 
+		// Set remote address from connection
+		req.RemoteAddr = r.RemoteAddr
+
 		resp, err := handler.Handle(ctx, req)
 		if err != nil {
 			status := a.errorStatus(err)
@@ -207,17 +213,14 @@ func (a *Adapter) errorStatus(err error) int {
 	switch {
 	case errors.Is(err, protokol.ErrBackendNotFound):
 		return http.StatusInternalServerError
+	case errors.Is(err, auth.ErrUnauthorized),
+		errors.Is(err, auth.ErrInvalidToken),
+		errors.Is(err, auth.ErrMissingToken):
+		return http.StatusUnauthorized
+	case errors.Is(err, ratelimit.ErrRateLimited):
+		return http.StatusTooManyRequests
 	default:
-		// Check for common middleware errors by message
-		msg := err.Error()
-		switch {
-		case strings.Contains(msg, "unauthorized"), strings.Contains(msg, "missing authorization"):
-			return http.StatusUnauthorized
-		case strings.Contains(msg, "rate limit"):
-			return http.StatusTooManyRequests
-		default:
-			return http.StatusInternalServerError
-		}
+		return http.StatusInternalServerError
 	}
 }
 

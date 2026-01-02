@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/jekabolt/protokol"
@@ -85,7 +86,7 @@ func (m *Middleware) Wrap(next adapters.Handler) adapters.Handler {
 
 		user, err := m.validator.Validate(ctx, token)
 		if err != nil {
-			return nil, ErrUnauthorized
+			return nil, fmt.Errorf("%w: %w", ErrUnauthorized, err)
 		}
 
 		ctx = context.WithValue(ctx, contextKey{}, user)

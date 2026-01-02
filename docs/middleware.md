@@ -125,9 +125,21 @@ rateLimiter := ratelimit.New(10, 20, ratelimit.ByIP)
 **Key Functions:**
 
 ```go
-ratelimit.ByIP      // Rate limit by client IP (X-Forwarded-For or X-Real-IP)
+ratelimit.ByIP      // Rate limit by client IP (X-Forwarded-For, X-Real-IP, or RemoteAddr)
 ratelimit.ByService // Rate limit by service name
 ratelimit.ByMethod  // Rate limit by service/method
+```
+
+**Note:** `ByIP` checks headers in order: `X-Forwarded-For`, `X-Real-IP`, then falls back to `RemoteAddr` from the connection. If no IP can be determined, rate limiting is bypassed for that request.
+
+**Options:**
+
+```go
+// Custom cleanup settings
+ratelimit.New(10, 20, ratelimit.ByIP,
+    ratelimit.WithCleanupInterval(2*time.Minute),  // How often to clean stale buckets
+    ratelimit.WithMaxIdleTime(10*time.Minute),     // Max idle time before bucket removal
+)
 ```
 
 **Custom Key Function:**
@@ -345,6 +357,7 @@ package cache
 
 import (
     "context"
+    "strings"
     "sync"
     "time"
 
@@ -406,7 +419,7 @@ func (m *Middleware) Wrap(next adapters.Handler) adapters.Handler {
 }
 
 func isReadMethod(name string) bool {
-    return len(name) >= 3 && (name[:3] == "Get" || name[:4] == "List")
+    return strings.HasPrefix(name, "Get") || strings.HasPrefix(name, "List")
 }
 ```
 
