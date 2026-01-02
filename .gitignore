@@ -1,11 +1,6 @@
 # JetBrains (GoLand, IntelliJ, etc.)
 .idea/
-*.iml
-*.ipr
-*.iws
-# VS Code
 .vscode/
-*.code-workspace
 
 # Binaries for programs and plugins
 *.exe
