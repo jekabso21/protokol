@@ -32,10 +32,16 @@ func (m *Middleware) Wrap(next adapters.Handler) adapters.Handler {
 	return adapters.HandlerFunc(func(ctx context.Context, req *protokol.Request) (resp *protokol.Response, err error) {
 		defer func() {
 			if r := recover(); r != nil {
+				service := "<nil>"
+				method := "<nil>"
+				if req != nil {
+					service = req.Service
+					method = req.Method
+				}
 				m.logger.ErrorContext(ctx, "panic recovered",
 					slog.Any("panic", r),
-					slog.String("service", req.Service),
-					slog.String("method", req.Method),
+					slog.String("service", service),
+					slog.String("method", method),
 					slog.String("stack", string(debug.Stack())),
 				)
 				resp = nil
